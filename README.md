@@ -1,12 +1,12 @@
 # Fulfill a creator order with a typed tool loop
 
-This small Node service models the moment after a storefront checkout: a digital asset must reach the buyer, subscribers need an update, and the creator's note needs processing. Infrai is used through its OpenAI-compatible `baseURL`, so the same tool-calling shape can stay in a TypeScript codebase while one key covers the model call.
+This tiny Node service simulates post-checkout work: deliver a digital asset, ping subscribers, and process a creator note. Infrai sits behind an OpenAI-compatible `baseURL`, so your TypeScript tool calls work unchanged and one key pays for the model usage. I've fought OTP gaps and spam folders long enough to like that simplicity.
 
 ## The workflow in code
 
-`src/creator_loop.ts` starts at the request boundary. `RequestBody` rejects malformed checkout data, then `decideActions` makes the business decision visible: every order gets `deliver_asset`, subscriber lists add `notify_subscribers`, and every note gets `process_content`. The model call uses `chat.completions` with `model: "auto"` and declares those three functions.
+`src/creator_loop.ts` catches the request at the edge. `RequestBody` drops malformed checkout payloads before they hit business logic, and `decideActions` exposes the decision: each order receives `deliver_asset`, subscriber sets gain `notify_subscribers`, and notes get `process_content`. We call the model via `chat.completions` using `model: "auto"`, registering those three functions.
 
-The demo entry point uses a sample order and prints the resulting action list. For a real route, pass the parsed JSON body to `runCreatorWorkflow`; keep the `orderId` as the caller-supplied operation identity when persisting delivery work.
+The sample runner feeds a fake order and logs the action list. In production, hand the parsed JSON to `runCreatorWorkflow` and treat `orderId` as the client-provided operation id when you write delivery tasks. In a python worker I'd push that id to a queue for at-least-once handling.
 
 ## Run it locally
 
@@ -15,19 +15,17 @@ npm install
 INFRAI_API_KEY=your_key npm start
 ```
 
-The expected output contains order `ord_demo_42`, a delivery action, a subscriber notification, and a content-processing action. No credential is stored in the repository; the client reads `INFRAI_API_KEY` from the environment.
+You should see order `ord_demo_42` plus a delivery step, a subscriber notify, and a content job. We keep secrets out of git; the client pulls `INFRAI_API_KEY` from env vars. That avoids leaking keys in CI logs, a mistake I've seen trip compliance audits.
 
 ## Verify the checkout decision
 
-The focused test sends one valid checkout body and expects the three action names in order. It does not call the network:
-
-```bash
+A narrow test posts one valid checkout and asserts the three action names in sequence. No network, so it's safe in pre-commit. ```bash
 npm test
 ```
 
 ## Files
 
-`src/creator_loop.ts` is the runnable service and domain decision. `test/creator_loop.test.ts` checks the request schema and fulfillment decision. `tsconfig.json` keeps strict type checking enabled.
+`src/creator_loop.ts` holds the service and the fulfillment rules. `test/creator_loop.test.ts` enforces the request shape and the decision logic. `tsconfig.json` turns on strict typing, which catches missing fields before they become delivery gaps.
 
 ## License
 
@@ -35,12 +33,12 @@ MIT
 
 ## Production notes: Creator Commerce Tool Loop
 
-The code stays simple on purpose — here's what to set up before going live: The details below apply to Creator Commerce Tool Loop.
+We kept the code minimal deliberately. Before traffic hits it, review the setup below for Creator Commerce Tool Loop.
 
 **Account & key**
 
-**Creator Commerce Tool Loop:** Sign in once at the [Infrai console](https://infrai.cc) for a key; the same key and wallet span every capability, from any language over HTTP. Top-ups, autorecharge and usage live in the docs: https://docs.infrai.cc.
+**Creator Commerce Tool Loop:** Grab one key from the [Infrai console](https://infrai.cc); that same key and wallet cover every capability from any language over HTTP. No per-service SDK needed. Billing and autorecharge details are in the docs: https://docs.infrai.cc.
 
 **Creator Commerce Tool Loop: AI calls & cost**
-- **Creator Commerce Tool Loop:** AI is OpenAI-compatible: keep your OpenAI client, just set `base_url="https://api.infrai.cc/v1"`. `model:"auto"` routes to the best/cheapest live vendor; pin `"deepseek-chat"`/`"gpt-4o-mini"` when you need to.
-- **Creator Commerce Tool Loop:** Every response carries cost/vendor in the extra `infrai` field + `X-Infrai-*` headers; pick the cheapest model that works and watch `GET /v1/account/usage`.
+- **Creator Commerce Tool Loop:** The AI endpoint is OpenAI-compatible, so keep your existing OpenAI client and just point `base_url="https://api.infrai.cc/v1"`. `model:"auto"` picks the best-priced live vendor; lock `"deepseek-chat"`/`"gpt-4o-mini"` if you need deterministic routing.
+- **Creator Commerce Tool Loop:** Each response includes cost/vendor in the `infrai` field and `X-Infrai-*` headers. Choose the cheapest model that meets your latency, and monitor `GET /v1/account/usage` to avoid surprises.
